@@ -1,4 +1,4 @@
-# main_hybrid.py (두 아키텍처의 장점만을 결합한 최종 완성본)
+# main_hybrid_final.py (두 아키텍처의 장점만을 결합한 최종 완성본)
 
 # --- 1. 기본 라이브러리 import ---
 from fastapi import FastAPI, HTTPException
@@ -119,11 +119,20 @@ def generate_node(state: MeetingMatchingState):
     logging.info("--- (모임 매칭) 3. 답변 생성 노드 ---")
     context = state["context"]
     original_query = f"제목: {state['title']}, 설명: {state['description']}"
+    
+    recommendation_data = []
+    for doc in context:
+        metadata = doc.metadata or {}
+        meeting_id = metadata.get('meeting_id')
+        title = metadata.get('title')
+        if meeting_id and title:
+            recommendation_data.append({"meeting_id": meeting_id, "title": title})
+
     context_str = "\n".join([f"모임 ID: {doc.metadata.get('meeting_id', 'N/A')}, 제목: {doc.metadata.get('title', 'N/A')}, 내용: {doc.page_content}" for doc in context])
     if not context:
         context_str = "유사한 모임을 찾지 못했습니다."
     
-    prompt_str = """당신은 사용자의 요청을 매우 엄격하게 분석하여 유사한 모임을 추천하는 MOIT 플랫폼의 AI입니다.
+    prompt_str = """당신은 사용자의 요청을 분석하여 유사한 모임을 추천하는 MOIT 플랫폼의 AI입니다.
 
 [검색된 유사 모임 정보]
 {context}
@@ -132,40 +141,41 @@ def generate_node(state: MeetingMatchingState):
 {query}
 
 [지시사항]
-1. [검색된 유사 모임 정보]가 "유사한 모임을 찾지 못했습니다."가 아닌 경우에만 아래 작업을 수행하세요.
-2. [검색된 유사 모임 정보]와 [사용자가 만들려는 모임 정보]를 비교하여, 정말로 유사하다고 판단되는 모임만 골라주세요.
-3. 사용자가 혹할 만한 매력적인 추천 문구를 작성해주세요.
-4. 최종 답변은 반드시 아래와 같은 JSON 형식으로만 반환해야 합니다. 추가적인 설명은 절대 붙이지 마세요.
+1. [검색된 유사 모임 정보]를 바탕으로, 사용자가 혹할 만한 매력적인 추천 요약 문구('summary')를 작성해주세요.
+2. 최종 답변은 반드시 아래와 같은 JSON 형식으로만 반환해야 합니다. 'recommendations' 배열에는 아래에 제공된 [추천 모임 데이터]를 그대로 복사해서 붙여넣기만 하세요.
 당신의 전체 응답은 다른 어떤 텍스트도 없이, 오직 '{{'로 시작해서 '}}'로 끝나는 유효한 JSON 객체여야 합니다.
+
+[추천 모임 데이터]
+{recommendations_placeholder}
 
 [JSON 형식]
 {{
-    "summary": "요약 추천 문구 (예: '이런 모임은 어떠세요? 비슷한 주제의 모임이 이미 활발하게 활동 중이에요!')",
-    "recommendations": [
-        {{
-            "meeting_id": "추천 모임의 ID",
-            "title": "추천 모임의 제목"
-        }}
-    ]
-}}
-
-[검색된 모임이 없는 경우 JSON 형식]
-{{
-    "summary": "",
-    "recommendations": []
+    "summary": "AI가 창의적으로 작성한 요약 추천 문구",
+    "recommendations": [ {{ "meeting_id": "...", "title": "..." }} ]
 }}
 """
     prompt = ChatPromptTemplate.from_template(prompt_str)
     chain = prompt | llm_for_meeting | StrOutputParser()
-    answer = chain.invoke({"context": context_str, "query": original_query})
+
+    answer = chain.invoke({
+        "context": context_str, 
+        "query": original_query,
+        "recommendations_placeholder": json.dumps(recommendation_data, ensure_ascii=False)
+    })
     return {"answer": answer}
 
 def check_helpfulness_node(state: MeetingMatchingState):
     logging.info("--- (모임 매칭) 4. 유용성 검증 노드 ---")
-    prompt = ChatPromptTemplate.from_template("당신은 AI가 생성한 추천이 사용자에게 정말 도움이 되는지 판단하는 검증 AI입니다. 'helpful' 또는 'unhelpful' 둘 중 하나로만 답변해주세요.\n\n[AI의 추천 내용]\n{answer}\n\n[사용자의 원래 요청]\n제목: {title}\n설명: {description}\n\n[검증 기준]\n- [AI 답변]의 `recommendations` 배열이 비어있지 않은지 확인하세요.\n- [AI 답변]의 `summary`가 긍정적인 추천 문구인지 확인하세요. (예: '비슷한 모임이 있어요' 등)\n- 위 두 조건이 모두 충족되고, 추천된 모임의 주제가 [원본 질문]과 관련이 있다면 'helpful'입니다.\n- 그 외 모든 경우는 'unhelpful'입니다.")
-    chain = prompt | llm_for_meeting | StrOutputParser()
-    raw_helpful = chain.invoke({"answer": state["answer"], "title": state["title"], "description": state["description"]})
-    is_helpful = "helpful" if "helpful" in raw_helpful.strip().lower() else "unhelpful"
+    try:
+        answer_json = json.loads(state["answer"])
+        if answer_json.get("recommendations"):
+            is_helpful = "helpful"
+        else:
+            is_helpful = "unhelpful"
+    except (json.JSONDecodeError, AttributeError):
+        is_helpful = "unhelpful"
+        
+    logging.info(f"답변 유용성 평가 (코드 기반): {is_helpful}")
     return {"is_helpful": is_helpful}
 
 def rewrite_query_node(state: MeetingMatchingState):
@@ -310,7 +320,9 @@ def call_meeting_matching_agent(state: MasterAgentState):
 
 def call_hobby_supervisor_agent(state: MasterAgentState):
     logging.info("--- 🎬 ReAct 감독관 (취미 추천)을 호출합니다. ---")
-    user_input_str = json.dumps(state["user_input"], ensure_ascii=False)
+    hobby_info = state["user_input"].get("hobby_info", {})
+    # hobby_info 딕셔너리를 ReAct 에이전트가 이해할 수 있는 문자열로 변환
+    user_input_str = json.dumps(hobby_info, ensure_ascii=False)
     input_data = {"messages": [("user", f"다음 사용자 정보를 바탕으로 최종 취미 추천을 해주세요: {user_input_str}")]}
     
     final_answer = ""
