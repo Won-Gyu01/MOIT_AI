@@ -76,12 +76,16 @@ def prepare_query_node(state: MeetingMatchingState):
     logging.info("--- (모임 매칭) 1. 검색어 생성 노드 ---")
     prompt = ChatPromptTemplate.from_template(
         "당신은 사용자가 만들려는 모임의 상세 정보를 바탕으로, PineconeDB에서 유사 모임을 찾기 위한 최적의 검색어를 생성하는 AI입니다. "
-        "아래 정보를 조합하여, 백터 데이터베이스에서 유사한 모임을 찾기 위한 가장 핵심적인 키워드가 담긴 자연스러운 문장 형태의 검색어를 만들어주세요.\n\n"
+        "아래 정보를 조합하여, 가장 핵심적인 키워드가 담긴 자연스러운 문장 형태의 검색어를 만들어주세요.\n\n"
         "[모임 정보]\n"
         "제목: {title}\n"
         "설명: {description}\n"
         "시간: {time}\n"
-        "장소: {location}"
+        "장소: {location}\n\n"
+        "[작성 가이드]\n"
+        "- '제목'과 '설명'에 담긴 핵심 활동이나 주제를 가장 중요한 키워드로 삼으세요.\n"
+        "- '장소'는 중요한 참고 정보이지만, 너무 구체적인 장소 이름보다는 더 넓은 지역(예: '서울', '강남')을 포함하는 것이 좋습니다.\n"
+        "- '시간' 정보는 검색어에 포함하지 않아도 좋습니다."
     )
     chain = prompt | llm_for_meeting | StrOutputParser()
     better_query = chain.invoke({
@@ -101,19 +105,24 @@ def prepare_query_node(state: MeetingMatchingState):
     }
 
 def retrieve_node(state: MeetingMatchingState):
-    logging.info(f"--- (모임 매칭) 2. 검색 노드 ({state['rewrite_count']+1}번째) ---")
+    logging.info(f"--- (모임 매칭) 2. 검색 노드 ({state.get('rewrite_count', 0)+1}번째) ---")
     meeting_index_name = os.getenv("PINECONE_INDEX_NAME_MEETING")
     embedding_function = OpenAIEmbeddings(model='text-embedding-3-large')
     vector_store = PineconeVectorStore.from_existing_index(index_name=meeting_index_name, embedding=embedding_function)
-    retriever = vector_store.as_retriever(search_type="similarity_score_threshold", search_kwargs={'score_threshold': 0.75, 'k': 2})
+  
+    retriever = vector_store.as_retriever(
+        search_type="similarity_score_threshold", 
+        search_kwargs={'score_threshold': 0.7, 'k': 2} 
+    )
     context = retriever.invoke(state["query"])
     return {"context": context}
+
 
 def generate_node(state: MeetingMatchingState):
     logging.info("--- (모임 매칭) 3. 답변 생성 노드 ---")
     context = state["context"]
     original_query = f"제목: {state['title']}, 설명: {state['description']}"
-    context_str = "\n".join([f"모임 ID: {doc.metadata.get('meeting_id', 'N/A')}, 내용: {doc.page_content}" for doc in context])
+    context_str = "\n".join([f"모임 ID: {doc.metadata.get('meeting_id', 'N/A')}, 제목: {doc.metadata.get('title', 'N/A')}, 내용: {doc.page_content}" for doc in context])
     if not context:
         context_str = "유사한 모임을 찾지 못했습니다."
     
@@ -127,9 +136,11 @@ def generate_node(state: MeetingMatchingState):
 
 [지시사항]
 1. [검색된 유사 모임 정보]가 "유사한 모임을 찾지 못했습니다."가 아닌 경우에만 아래 작업을 수행하세요.
-2. [검색된 유사 모임 정보]와 [사용자가 만들려는 모임 정보]를 비교하여, 정말로 유사하다고 판단되는 모임만 골라주세요. 추천할 모임이 하나뿐이라면, 배열에 하나만 포함합니다.
+2. [검색된 유사 모임 정보]와 [사용자가 만들려는 모임 정보]를 비교하여, 정말로 유사하다고 판단되는 모임만 골라주세요.
 3. 사용자가 혹할 만한 매력적인 추천 문구를 작성해주세요.
 4. 최종 답변은 반드시 아래와 같은 JSON 형식으로만 반환해야 합니다. 추가적인 설명은 절대 붙이지 마세요.
+
+당신의 전체 응답은 다른 어떤 텍스트도 없이, 오직 '{{'로 시작해서 '}}'로 끝나는 유효한 JSON 객체여야 합니다.
 
 [JSON 형식]
 {{
@@ -155,13 +166,11 @@ def generate_node(state: MeetingMatchingState):
 
 def check_helpfulness_node(state: MeetingMatchingState):
     logging.info("--- (모임 매칭) 4. 유용성 검증 노드 ---")
-    prompt = ChatPromptTemplate.from_template(
-        """당신은 AI가 생성한 추천이 사용자에게 정말 도움이 되는지 판단하는 검증 AI입니다. 
-        'helpful' 또는 'unhelpful' 둘 중 하나로만 답변해주세요.\n\n[AI의 추천 내용]\n{answer}\n\n[사용자의 원래 요청]\n제목: {title}\n설명: {description}
-        \n\n[검증 기준]\n- `recommendations` 배열이 비어있지 않고, 추천된 모임의 주제가 사용자의 요청과 관련이 있다면 'helpful'입니다.\n- 그 외 모든 경우는 'unhelpful'입니다.
-        다른 설명은 일절 추가하지 말고, 오직 'helpful' 또는 'unhelpful' 둘 중 하나의 단어로만 답변해야 합니다.""")
+    prompt = ChatPromptTemplate.from_template("당신은 AI가 생성한 추천이 사용자에게 정말 도움이 되는지 판단하는 검증 AI입니다. 'helpful' 또는 'unhelpful' 둘 중 하나로만 답변해주세요.\n\n[AI의 추천 내용]\n{answer}\n\n[사용자의 원래 요청]\n제목: {title}\n설명: {description}\n\n[검증 기준]\n- [AI 답변]의 `recommendations` 배열이 비어있지 않은지 확인하세요.\n- [AI 답변]의 `summary`가 긍정적인 추천 문구인지 확인하세요. (예: '비슷한 모임이 있어요' 등)\n- 위 두 조건이 모두 충족되고, 추천된 모임의 주제가 [원본 질문]과 관련이 있다면 'helpful'입니다.\n- 그 외 모든 경우는 'unhelpful'입니다.")
     chain = prompt | llm_for_meeting | StrOutputParser()
-    is_helpful = chain.invoke({"answer": state["answer"], "title": state["title"], "description": state["description"]})
+    # 파싱 오류를 방지하기 위해 strip()과 lower()를 추가합니다.
+    raw_helpful = chain.invoke({"answer": state["answer"], "title": state["title"], "description": state["description"]})
+    is_helpful = "helpful" if "helpful" in raw_helpful.strip().lower() else "unhelpful"
     return {"is_helpful": is_helpful}
 
 def rewrite_query_node(state: MeetingMatchingState):
@@ -190,23 +199,27 @@ builder.add_edge("rewrite_query", "retrieve")
 meeting_matching_agent = builder.compile()
 
 
-# --- 6. AI 전문가(도구)들 정의 ---
-
-# 전문가 1: Self-RAG 모임 매칭 전문가
+# --- '모임 매칭 전문가'를 Tool로 포장하는 부분 ---
 @tool
 def run_meeting_matching_agent_tool(meeting_info: dict) -> str:
     """
-    사용자가 만들려는 모임의 상세 정보(딕셔너리)를 입력받아, Self-RAG 기반의 지능형 에이전트를 실행하여 유사 모임을 찾아 추천 결과를 JSON 문자열로 반환합니다.
-    'meeting_info' 딕셔너리에는 'title', 'description', 'time', 'location' 키가 포함되어야 합니다.
+    사용자가 만들려는 모임의 상세 정보(딕셔셔너리)를 입력받아, Self-RAG 기반의 지능형 에이전트를 실행하여 유사 모임을 찾아 추천 결과를 JSON 문자열로 반환합니다.
     """
     logging.info(f"--- 🤖 'Self-RAG 모임 매칭 전문가'를 호출합니다. 입력: {meeting_info} ---")
     try:
-        final_state = meeting_matching_agent.invoke(meeting_info)
+        # [★수정된 핵심 부분★]
+        # 에이전트가 모든 루프를 마치고 내놓은 최종 답변을 그대로 신뢰하고 반환합니다.
+        # 불필요한 'is_helpful' 외부 검증 로직을 제거합니다.
+        final_state = meeting_matching_agent.invoke(meeting_info, {"recursion_limit": 5})
         logging.info("--- ✅ Self-RAG 모임 매칭이 성공적으로 완료되었습니다. ---")
+        
+        # 에이전트의 최종 답변을 그대로 반환
         return final_state.get("answer", json.dumps({"summary": "오류: 최종 답변을 생성하지 못했습니다.", "recommendations": []}))
+            
     except Exception as e:
         logging.error(f"Self-RAG 모임 매칭 에이전트 실행 중 오류 발생: {e}", exc_info=True)
         return json.dumps({"summary": "모임 추천 중 심각한 오류가 발생했습니다.", "recommendations": []})
+
 
 # 전문가 2: 사진 분석 전문가
 @tool
@@ -337,17 +350,29 @@ async def invoke_agent(request: AgentInvokeRequest):
     사용자의 모든 요청을 받아 감독관 AI 에이전트를 실행하고 최종 답변을 반환합니다.
     """
     try:
-        input_data = {"messages": request.messages}
+        # 복잡한 딕셔너리 데이터를 json.dumps()를 사용해 하나의 문자열로 변환합니다.
+        processed_messages = []
+        for role, content in request.messages:
+            if isinstance(content, dict):
+                # content가 딕셔너리이면, JSON 문자열로 변환
+                processed_messages.append((role, json.dumps(content, ensure_ascii=False)))
+            else:
+                # 딕셔너리가 아니면(일반 텍스트 등) 그대로 사용
+                processed_messages.append((role, content))
+
+        input_data = {"messages": processed_messages}
+
         final_answer = ""
         for event in supervisor_agent.stream(input_data, {"recursion_limit": 15}):
             if "messages" in event:
                 last_message = event["messages"][-1]
                 if isinstance(last_message.content, str) and not last_message.tool_calls:
                     final_answer = last_message.content
+        
         return {"final_answer": final_answer}
     except Exception as e:
         logging.error(f"Agent 실행 중 오류 발생: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail="AI 에이전트 처리 중 내부 서버 오류가 발생했습니다.")
+        raise HTTPException(status_code=500, detail=f"AI 에이전트 처리 중 내부 서버 오류가 발생했습니다: {str(e)}")
 
 # --- 9. Pinecone DB 업데이트/삭제 엔드포인트 ---
 class NewMeeting(BaseModel):
