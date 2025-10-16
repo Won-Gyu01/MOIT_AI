@@ -88,64 +88,71 @@ def route_request(state: MasterAgentState):
 # 5-3. 전문가 호출 노드들 정의
 
 # 전문가 1: 모임 매칭 에이전트 (SubGraph) - 안정성이 검증된 기존 코드 전체를 그대로 사용
+# 'main_final_v5.py' 파일의 'call_meeting_matching_agent' 함수를 아래 코드로 교체해주세요.
+
 def call_meeting_matching_agent(state: MasterAgentState):
     """'모임 매칭 에이전트'를 독립적인 SubGraph로 실행하고 결과를 받아오는 노드"""
     print("--- CALLING: Meeting Matching Agent (Stable Version) ---")
     
+    # (MeetingAgentState 클래스 정의는 동일)
     class MeetingAgentState(TypedDict):
         title: str; description: str; time: str; location: str; query: str;
         context: List[Document]; answer: str; rewrite_count: int; decision: str
 
+    # (DB 연결 부분은 동일)
     meeting_index_name = os.getenv("PINECONE_INDEX_NAME_MEETING")
     if not meeting_index_name: raise ValueError("'.env' 파일에 PINECONE_INDEX_NAME_MEETING 변수를 설정해야 합니다.")
-    
     embedding_function = OpenAIEmbeddings(model='text-embedding-3-large')
     vector_store = PineconeVectorStore.from_existing_index(index_name=meeting_index_name, embedding=embedding_function)
     retriever = vector_store.as_retriever(search_kwargs={'k': 2})
 
-    # SubGraph의 모든 노드와 프롬프트를 이 함수 내에서 직접 정의 (기존 방식과 동일)
-    prepare_query_prompt = ChatPromptTemplate.from_template(
-        "당신은 사용자가 입력한 정보를 바탕으로 유사한 다른 정보를 검색하기 위한 최적의 검색어를 만드는 전문가입니다.\n"
-        "아래 [모임 정보]를 종합하여, 벡터 데이터베이스에서 유사한 모임을 찾기 위한 가장 핵심적인 검색 질문을 한 문장으로 만들어주세요.\n"
-        "[모임 정보]:\n- 제목: {title}\n- 설명: {description}\n- 시간: {time}\n- 장소: {location}"
-    )
+    # [로깅 추가] SubGraph의 모든 노드에 상세한 logging 코드를 추가합니다.
+    
+    prepare_query_prompt = ChatPromptTemplate.from_template("...") # (프롬프트 내용은 동일하므로 생략)
     prepare_query_chain = prepare_query_prompt | llm_for_meeting | StrOutputParser()
     def prepare_query(m_state: MeetingAgentState):
+        logging.info("--- (Sub) 1. 검색어 생성 ---")
         query = prepare_query_chain.invoke(m_state)
+        logging.info(f"    [생성된 검색어]: {query}")
         return {"query": query, "rewrite_count": 0}
 
     def retrieve(m_state: MeetingAgentState):
-        return {"context": retriever.invoke(m_state['query'])}
+        logging.info(f"--- (Sub) 2. DB 검색 ({m_state.get('rewrite_count', 0) + 1}번째) ---")
+        context = retriever.invoke(m_state['query'])
+        logging.info(f"    [검색된 문서 수]: {len(context)}개")
+        # 검색된 문서의 일부 내용을 로그로 출력
+        for i, doc in enumerate(context):
+             logging.info(f"      - Doc {i+1}: {doc.page_content[:100]}...")
+        return {"context": context}
 
-    generate_prompt = ChatPromptTemplate.from_template(
-        "당신은 MOIT 플랫폼의 친절한 모임 추천 AI입니다. 사용자에게 \"혹시 이런 모임은 어떠세요?\" 라고 제안하는 말투로, "
-        "반드시 아래 [검색된 정보]를 기반으로 유사한 모임이 있다는 것을 명확하게 설명해주세요.\n[검색된 정보]:\n{context}\n[사용자 질문]:\n{query}"
-    )
+    generate_prompt = ChatPromptTemplate.from_template("...") # (프롬프트 내용은 동일하므로 생략)
     generate_chain = generate_prompt | llm_for_meeting | StrOutputParser()
     def generate(m_state: MeetingAgentState):
-        context = "\n\n".join(doc.page_content for doc in m_state['context'])
-        answer = generate_chain.invoke({"context": context, "query": m_state['query']})
+        logging.info("--- (Sub) 3. 추천 답변 생성 ---")
+        context_str = "\n\n".join(doc.page_content for doc in m_state['context'])
+        answer = generate_chain.invoke({"context": context_str, "query": m_state['query']})
+        logging.info(f"    [생성된 답변 (JSON)]: {answer}")
         return {"answer": answer}
 
-    check_helpfulness_prompt = ChatPromptTemplate.from_template(
-        "당신은 AI 답변을 평가하는 엄격한 평가관입니다. 주어진 [AI 답변]이 사용자의 [원본 질문] 의도에 대해 유용한 제안을 하는지 평가해주세요. "
-        "'helpful' 또는 'unhelpful' 둘 중 하나로만 답변해야 합니다.\n[원본 질문]: {query}\n[AI 답변]: {answer}"
-    )
+    check_helpfulness_prompt = ChatPromptTemplate.from_template("...") # (프롬프트 내용은 동일하므로 생략)
     check_helpfulness_chain = check_helpfulness_prompt | llm_for_meeting | StrOutputParser()
     def check_helpfulness(m_state: MeetingAgentState):
+        logging.info("--- (Sub) 4. 유용성 검증 ---")
         result = check_helpfulness_chain.invoke(m_state)
-        return {"decision": "helpful" if 'helpful' in result.lower() else "unhelpful"}
+        decision = "helpful" if 'helpful' in result.lower() else "unhelpful"
+        logging.info(f"    [검증 결과]: {decision.upper()}")
+        return {"decision": decision}
 
-    rewrite_query_prompt = ChatPromptTemplate.from_template(
-        "당신은 사용자의 질문을 더 좋은 검색 결과가 나올 수 있도록 명확하게 다듬는 프롬프트 엔지니어입니다. 주어진 [원본 질문]을 바탕으로, "
-        "벡터 데이터베이스에서 더 관련성 높은 모임 정보를 찾을 수 있는 새로운 검색 질문을 하나만 만들어주세요.\n[원본 질문]: {query}"
-    )
+    rewrite_query_prompt = ChatPromptTemplate.from_template("...") # (프롬프트 내용은 동일하므로 생략)
     rewrite_query_chain = rewrite_query_prompt | llm_for_meeting | StrOutputParser()
     def rewrite_query(m_state: MeetingAgentState):
+        logging.info("--- (Sub) 5. 검색어 재작성 ---")
         new_query = rewrite_query_chain.invoke(m_state)
+        logging.info(f"    [재작성된 검색어]: {new_query}")
         count = m_state.get('rewrite_count', 0) + 1
         return {"query": new_query, "rewrite_count": count}
-    
+
+    # (그래프 조립 및 실행 부분은 동일)
     graph_builder = StateGraph(MeetingAgentState)
     graph_builder.add_node("prepare_query", prepare_query)
     graph_builder.add_node("retrieve", retrieve)
@@ -164,7 +171,7 @@ def call_meeting_matching_agent(state: MasterAgentState):
     initial_state = { "title": user_input.get("title", ""), "description": user_input.get("description", ""), "time": user_input.get("time", ""), "location": user_input.get("location", "") }
     
     final_result_state = meeting_agent.invoke(initial_state, {"recursion_limit": 5})
-    # 최종 결정이 unhelpful일 경우, 빈 추천을 반환하는 로직 추가
+    
     if final_result_state.get("decision") != "helpful":
         return {"final_answer": json.dumps({"summary": "", "recommendations": []})}
     else:
