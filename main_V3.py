@@ -108,7 +108,10 @@ def call_meeting_matching_agent(state: MasterAgentState):
 
     # [로깅 추가] SubGraph의 모든 노드에 상세한 logging 코드를 추가합니다.
     
-    prepare_query_prompt = ChatPromptTemplate.from_template("...") # (프롬프트 내용은 동일하므로 생략)
+    prepare_query_prompt = ChatPromptTemplate.from_template("""
+        당신은 사용자가 입력한 정보를 바탕으로 유사한 다른 정보를 검색하기 위한 최적의 검색어를 만드는 전문가입니다.\n
+        아래 [모임 정보]를 종합하여, 벡터 데이터베이스에서 유사한 모임을 찾기 위한 가장 핵심적인 검색 질문을 한 문장으로 만들어주세요.\n
+        [모임 정보]:\n- 제목: {title}\n- 설명: {description}\n- 시간: {time}\n- 장소: {location}""")
     prepare_query_chain = prepare_query_prompt | llm_for_meeting | StrOutputParser()
     def prepare_query(m_state: MeetingAgentState):
         logging.info("--- (Sub) 1. 검색어 생성 ---")
@@ -125,7 +128,8 @@ def call_meeting_matching_agent(state: MasterAgentState):
              logging.info(f"      - Doc {i+1}: {doc.page_content[:100]}...")
         return {"context": context}
 
-    generate_prompt = ChatPromptTemplate.from_template("...") # (프롬프트 내용은 동일하므로 생략)
+    generate_prompt = ChatPromptTemplate.from_template("""당신은 MOIT 플랫폼의 친절한 모임 추천 AI입니다. 사용자에게 \"혹시 이런 모임은 어떠세요?\" 라고 제안하는 말투로, 
+        반드시 아래 [검색된 정보]를 기반으로 유사한 모임이 있다는 것을 명확하게 설명해주세요.\n[검색된 정보]:\n{context}\n[사용자 질문]:\n{query}""")
     generate_chain = generate_prompt | llm_for_meeting | StrOutputParser()
     def generate(m_state: MeetingAgentState):
         logging.info("--- (Sub) 3. 추천 답변 생성 ---")
@@ -134,7 +138,8 @@ def call_meeting_matching_agent(state: MasterAgentState):
         logging.info(f"    [생성된 답변 (JSON)]: {answer}")
         return {"answer": answer}
 
-    check_helpfulness_prompt = ChatPromptTemplate.from_template("...") # (프롬프트 내용은 동일하므로 생략)
+    check_helpfulness_prompt = ChatPromptTemplate.from_template("""당신은 AI 답변을 평가하는 엄격한 평가관입니다. 주어진 [AI 답변]이 사용자의 [원본 질문] 의도에 대해 유용한 제안을 하는지 평가해주세요.
+        'helpful' 또는 'unhelpful' 둘 중 하나로만 답변해야 합니다.\n[원본 질문]: {query}\n[AI 답변]: {answer}""") 
     check_helpfulness_chain = check_helpfulness_prompt | llm_for_meeting | StrOutputParser()
     def check_helpfulness(m_state: MeetingAgentState):
         logging.info("--- (Sub) 4. 유용성 검증 ---")
@@ -143,7 +148,8 @@ def call_meeting_matching_agent(state: MasterAgentState):
         logging.info(f"    [검증 결과]: {decision.upper()}")
         return {"decision": decision}
 
-    rewrite_query_prompt = ChatPromptTemplate.from_template("...") # (프롬프트 내용은 동일하므로 생략)
+    rewrite_query_prompt = ChatPromptTemplate.from_template("""당신은 사용자의 질문을 더 좋은 검색 결과가 나올 수 있도록 명확하게 다듬는 프롬프트 엔지니어입니다. 주어진 [원본 질문]을 바탕으로,
+        벡터 데이터베이스에서 더 관련성 높은 모임 정보를 찾을 수 있는 새로운 검색 질문을 하나만 만들어주세요.\n[원본 질문]: {query}""")
     rewrite_query_chain = rewrite_query_prompt | llm_for_meeting | StrOutputParser()
     def rewrite_query(m_state: MeetingAgentState):
         logging.info("--- (Sub) 5. 검색어 재작성 ---")
