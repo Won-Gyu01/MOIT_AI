@@ -30,19 +30,19 @@ As the team leader and AI architect, I was responsible for designing and impleme
 Here are the detailed diagrams illustrating the core system architecture and the reasoning logic of our Multi-Agent system.
 
 ### 1. Master Agent Structure (LangGraph Router)
-<img src="https://github.com/user-attachments/assets/fc39bbd7-df22-43c2-be0c-0ea70e68911a" width="200" alt="Master Agent Structure Diagram" />
+<img src="https://github.com/user-attachments/assets/9244ce21-f4ef-45d4-992d-94e7c896ef31" width="200" alt="Master Agent Structure Diagram" />
 > **Figure 1.** High-level overview of the Master Agent routing logic, dispatching user queries to the specialized 'hobby_recommender', 'general_searcher', or 'meeting_matcher' agent.
 
 <br>
 
 ### 2. Hobby Recommender Logic (Multimodal Gemini Flow)
-<img src="https://github.com/user-attachments/assets/d8891212-bd48-41f0-91c4-6a324adeb839" width="600" alt="Hobby Recommender Logic (Gemini Multimodal)" />
+<img src="https://github.com/user-attachments/assets/ce54952b-f593-4893-bf9c-38a4e2f6bd3c" width="600" alt="Hobby Recommender Logic (Gemini Multimodal)" />
 > **Figure 2.** Detailed reasoning flow of the Multimodal Hobby Recommender agent, utilizing Google Gemini to analyze both user survey text and profile images for personalized recommendation.
 
 <br>
 
 ### 3. Meeting Matcher Reasoning Flow (Self-RAG Loop)
-<img src="https://github.com/user-attachments/assets/a6298d18-4111-4f9c-bcb4-6b52fa2f74ee" width="200" alt="Meeting Matcher Reasoning Flow (Self-RAG Loop)" />
+<img src="https://github.com/user-attachments/assets/e88d9e29-c3f2-463f-a461-b524f5181535" width="200" alt="Meeting Matcher Reasoning Flow (Self-RAG Loop)" />
 > **Figure 3.** Detailed view of the Meeting Matcher agent's iterative Retrieval-Augmented Generation (Self-RAG) loop (Retrieve ➡️ Generate ➡️ Reflect ➡️ Rewrite) to find factual existing meeting information.
 
 ---
