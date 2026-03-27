@@ -29,17 +29,6 @@ As the team leader and AI architect, I was responsible for designing and impleme
 
 ---
 
-##  My Role & Contributions
-**Role:** Lead Developer & AI Agent Architect (`@Won-Gyu01`)
-
-As the team leader and AI architect, I was responsible for designing and implementing the core Agentic AI pipeline:
-* **Trajectory Control System:** Designed a deterministic routing architecture using LangGraph to prevent ReAct agents from stopping early without sufficient exploration.
-* **Reasoning-Level Personalization (Gemini):** Engineered a multimodal prompt framework that analyzes both user survey data and images to generate highly personalized recommendations.
-* **Self-RAG & API Integration:** Built an iterative Retrieval-Augmented Generation (Self-RAG) pipeline combining OpenAI APIs and **Pinecone vector database** to ensure factual consistency.
-* **General Search Integration:** Implemented a general search routing fallback using Tavily to handle weather and real-time queries.
-
----
-
 ##  System Architecture & Reasoning Flow
 
 Here are the detailed diagrams illustrating the core system architecture and the reasoning logic of our Multi-Agent system.
