@@ -1,4 +1,4 @@
-> **Note on Repository Structure:**
+> ** Note on Repository Structure:**
 > This repository houses the **Standalone Core AI Agent Engine (v3.0)** featuring the advanced LangGraph and Gemini multimodal logic. 
 > For the full-stack web application integration (Frontend/Backend) managed by our team, please visit the [MOIT Full-Stack Team Repository](https://github.com/taehyeooo/moit-project.git).
 
@@ -8,9 +8,24 @@
 > * Gold Prize, The 19th Capstone Design Competition (Soonchunhyang Univ.)*
 
 ##  Project Overview
-**MOIT** is a personalized hobby matching platform powered by a Multi-Agent system. It is designed to address the limitations of conventional LLM agents—such as **premature termination** and **hallucination**—when dealing with ambiguous user queries. 
+**MOIT** is a personalized hobby matching platform powered by a Multi-Agent system. 
 
-By utilizing **LangGraph (StateGraph)**, we engineered a robust architecture that strictly controls the agent's reasoning trajectory and integrates users' implicit contexts (e.g., psychological state, constraints) into the recommendation process.
+During the initial development phase, the recommendation agent was built using a standard **ReAct architecture**. However, we encountered critical limitations: **premature termination**, where the agent would abruptly stop its reasoning process without fully exploring the vector database, and occasional **hallucinations** leading to sub-optimal matches.
+
+To overcome these issues, we successfully migrated the entire core logic to **LangGraph (StateGraph)**. This allowed us to engineer a robust architecture that strictly controls the agent's reasoning trajectory, forcing it to complete the necessary Retrieval and Reflection (Self-RAG) loops before generating a final personalized recommendation.
+
+---
+
+##  My Role & Contributions
+**Role:** Lead Developer & AI Agent Architect (`@Won-Gyu01`)
+
+As the team leader and AI architect, I was responsible for designing and implementing the core Agentic AI pipeline:
+* **Architecture Evolution (ReAct -> StateGraph):** Identified the limitations of the initial ReAct agent (hallucination and premature termination) and successfully refactored the system into a deterministic LangGraph architecture to guarantee complete reasoning cycles.
+* **Reasoning-Level Personalization (Gemini):** Engineered a multimodal prompt framework that analyzes both user survey data and images to generate highly personalized recommendations.
+* **Self-RAG & API Integration:** Built an iterative Retrieval-Augmented Generation (Self-RAG) pipeline combining OpenAI APIs and **Pinecone vector database** to ensure factual consistency.
+* **General Search Integration:** Implemented a general search routing fallback using Tavily to handle weather and real-time queries.
+
+*( **Note:** The core Agentic AI logic, including the LangGraph routing and Self-RAG loop, is fully implemented in the **`main.py`** file of this repository.)*
 
 ---
 
