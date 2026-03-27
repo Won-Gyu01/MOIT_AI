@@ -68,3 +68,31 @@ source venv/bin/activate  # Windows: venv\Scripts\activate
 
 # Install dependencies
 pip install -r requirements.txt
+
+### 2. Environment Variables (`.env`)
+Create a `.env` file in the root directory and add the following API keys:
+```env
+OPENAI_API_KEY="your_openai_api_key"
+GOOGLE_API_KEY="your_gemini_api_key"
+TAVILY_API_KEY="your_tavily_api_key"
+PINECONE_API_KEY="your_pinecone_api_key"
+PINECONE_INDEX_NAME_MEETING="your_pinecone_index_name"
+```
+
+### 3. Run FastAPI Server
+```bash
+uvicorn main:app --reload
+```
+The server will start at `http://127.0.0.1:8000`.
+
+### 4. Test via Swagger UI
+1. Navigate to `http://127.0.0.1:8000/docs` in your browser.
+2. Open the `POST /agent/invoke` endpoint.
+3. Click **Try it out** and test the Master Agent routing logic!
+
+---
+
+##  Publications & Achievements
+* **Paper:** "A Study on AI Agent-Based Hobby Matching Platform for Health Promotion" (Expected Dec 2025)
+* **Awards:** *  **Gold Prize**, The 19th Capstone Design Competition (Soonchunhyang Univ.)
+  *  **Bronze Prize**, 2025 Next-Generation Display Consortium Creative Capstone Design Competition (Chungnam National University, Korea)
