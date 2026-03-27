@@ -30,21 +30,20 @@ As the team leader and AI architect, I was responsible for designing and impleme
 Here are the detailed diagrams illustrating the core system architecture and the reasoning logic of our Multi-Agent system.
 
 ### 1. Master Agent Structure (LangGraph Router)
-<img src="https://github.com/user-attachments/assets/9244ce21-f4ef-45d4-992d-94e7c896ef31" width="200" alt="Master Agent Structure Diagram" />
+<img width="600" alt="Hobby Recommender Logic (Gemini Multimodal)" src="https://github.com/user-attachments/assets/38a3cd24-5d55-4e97-880d-a8abe559a807" />
 > **Figure 1.** High-level overview of the Master Agent routing logic, dispatching user queries to the specialized 'hobby_recommender', 'general_searcher', or 'meeting_matcher' agent.
 
 <br>
 
 ### 2. Hobby Recommender Logic (Multimodal Gemini Flow)
-<img src="https://github.com/user-attachments/assets/ce54952b-f593-4893-bf9c-38a4e2f6bd3c" width="600" alt="Hobby Recommender Logic (Gemini Multimodal)" />
+<img width="200" alt="Meeting Matcher Reasoning Flow (Self-RAG Loop)" src="https://github.com/user-attachments/assets/2a2f021c-32a3-47b4-9cae-da784a145622" />
 > **Figure 2.** Detailed reasoning flow of the Multimodal Hobby Recommender agent, utilizing Google Gemini to analyze both user survey text and profile images for personalized recommendation.
 
 <br>
 
 ### 3. Meeting Matcher Reasoning Flow (Self-RAG Loop)
-<img src="https://github.com/user-attachments/assets/e88d9e29-c3f2-463f-a461-b524f5181535" width="200" alt="Meeting Matcher Reasoning Flow (Self-RAG Loop)" />
-> **Figure 3.** Detailed view of the Meeting Matcher agent's iterative Retrieval-Augmented Generation (Self-RAG) loop (Retrieve ➡️ Generate ➡️ Reflect ➡️ Rewrite) to find factual existing meeting information.
-
+<img width="200" alt="Master Agent Structure Diagram" src="https://github.com/user-attachments/assets/d700d59f-8ef6-4d98-865b-1d3b5752ebeb" />
+> **Figure 3.** Detailed view of the Meeting Matcher agent's iterative Retrieval-Augmented Generation (Self-RAG) loop (Retrieve -> Generate -> Reflect -> Rewrite) to find factual existing meeting information.
 ---
 
 ##  Tech Stack
