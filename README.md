@@ -1,6 +1,6 @@
 > **Note on Repository Structure:**
 > This repository houses the **Standalone Core AI Agent Engine (v3.0)** featuring the advanced LangGraph and Gemini multimodal logic. 
-> For the full-stack web application integration (Frontend/Backend) managed by our team, please visit the [MOIT Full-Stack Team Repository](여기에_팀_레포_링크_삽입).
+> For the full-stack web application integration (Frontend/Backend) managed by our team, please visit the [MOIT Full-Stack Team Repository](https://github.com/taehyeooo/moit-project.git).
 
 # MOIT: Multi-Agent Hobby Matching Platform 
 
@@ -43,11 +43,11 @@ Here are the detailed diagrams illustrating the core system architecture and the
 
 ### 3. Meeting Matcher Reasoning Flow (Self-RAG Loop)
 <img src="https://github.com/user-attachments/assets/a6298d18-4111-4f9c-bcb4-6b52fa2f74ee" width="200" alt="Meeting Matcher Reasoning Flow (Self-RAG Loop)" />
-> **Figure 3.** Detailed view of the Meeting Matcher agent's iterative Retrieval-Augmented Generation (Self-RAG) loop (Retrieve ➡️ Generate ➡️ Reflect ➡️ Rewrite) to find factual existing meeting information.
+> **Figure 3.** Detailed view of the Meeting Matcher agent's iterative Retrieval-Augmented Generation (Self-RAG) loop (Retrieve -> Generate -> Reflect -> Rewrite) to find factual existing meeting information.
 
 ---
 
-## 🛠️ Tech Stack
+##  Tech Stack
 * **AI/Agent Framework:** LangChain, LangGraph, OpenAI API, Google Gemini API, Tavily API
 * **Database:** Pinecone (Vector DB)
 * **Backend:** FastAPI, Uvicorn
